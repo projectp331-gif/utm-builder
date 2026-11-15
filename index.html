@@ -1,0 +1,901 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UTM Builder</title>
+<style>
+/* ===== الألوان (فاتح/داكن) ===== */
+:root{--bg:#f4f6f8;--card:#fff;--text:#1f2933;--muted:#6b7785;--primary:#2f6f73;--primary-text:#fff;--border:#d9e0e6;--ok:#2e7d4f;--err:#b3261e;--warn:#9a6700;--input:#fff;--code:#eef3f5;--nav:#ffffffee}
+[data-theme=dark]{--bg:#141a1f;--card:#1d262d;--text:#e6edf2;--muted:#9aa8b4;--primary:#5fb3b7;--primary-text:#0d1317;--border:#2e3b45;--ok:#6cc790;--err:#ff8a80;--warn:#f0c060;--input:#11171c;--code:#11181d;--nav:#141a1fee}
+*{box-sizing:border-box}
+body{margin:0;font-family:Tahoma,"Segoe UI","Noto Sans Arabic",system-ui,sans-serif;background:var(--bg);color:var(--text);font-size:16px;line-height:1.6}
+.wrap{max-width:640px;margin:0 auto;padding:12px 12px 80px}
+/* شريط التنقل العلوي الثابت */
+.nav{position:sticky;top:0;z-index:5;background:var(--nav);backdrop-filter:blur(8px);border-bottom:1px solid var(--border);padding:8px 12px 6px}
+.nav-top{max-width:640px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:8px}
+.nav-actions{display:flex;gap:6px}
+.nav-tabs{max-width:640px;margin:6px auto 0;display:flex;gap:6px;overflow-x:auto}
+h1{font-size:20px;margin:0}
+.btn{min-height:48px;padding:10px 16px;border-radius:12px;border:1px solid var(--border);background:var(--card);color:var(--text);font-size:16px;cursor:pointer;font-family:inherit}
+.btn.primary{background:var(--primary);color:var(--primary-text);border-color:transparent;font-weight:bold}
+.btn.danger{color:var(--err)}
+.btn.small{min-height:40px;padding:6px 12px;font-size:14px}
+.tab{flex:1;white-space:nowrap;min-height:44px}
+.tab.active{background:var(--primary);color:var(--primary-text);border-color:transparent;font-weight:bold}
+h3{margin:0 0 8px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:14px;margin-bottom:12px}
+label{display:block;font-weight:bold;margin:10px 0 4px;font-size:15px}
+input,textarea,select{width:100%;min-height:48px;padding:10px 12px;border-radius:12px;border:1px solid var(--border);background:var(--input);color:var(--text);font-size:16px;font-family:inherit}
+textarea{min-height:120px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.row>*{flex:1}
+.row>.btn{flex:0 0 auto}
+.hint{font-size:13px;color:var(--muted)}
+.warn{color:var(--warn);font-size:14px;margin-top:8px}
+.url-box{word-break:break-all;direction:ltr;text-align:left;background:var(--code);padding:10px;border-radius:12px;font-family:monospace;font-size:14px;min-height:50px;margin-top:6px}
+.actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.actions .btn{flex:1 1 auto}
+.badge{display:inline-block;background:var(--code);border-radius:8px;padding:2px 8px;font-size:13px}
+.banner{background:var(--code);border-radius:12px;padding:10px;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{padding:8px;border-bottom:1px solid var(--border);text-align:start;vertical-align:top}
+.err-text{color:var(--err)}
+.toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:var(--text);color:var(--bg);padding:12px 18px;border-radius:12px;opacity:0;transition:opacity .3s;pointer-events:none;max-width:90%;text-align:center;z-index:20}
+.toast.show{opacity:1}
+.toast.err{background:var(--err);color:#fff}
+.toast.ok{background:var(--ok);color:#fff}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.5);display:none;align-items:center;justify-content:center;padding:16px;z-index:10}
+.modal.show{display:flex}
+.modal .card{max-width:380px;width:100%;text-align:center}
+canvas{max-width:100%;height:auto;background:#fff;border-radius:8px}
+.hidden{display:none!important}
+</style>
+</head>
+<body>
+
+<!-- شريط التنقل: الاسم + اللغة + الثيم + التبويبات -->
+<header class="nav">
+  <div class="nav-top">
+    <h1>UTM Builder</h1>
+    <div class="nav-actions">
+      <button class="btn small" id="langBtn">عربي</button>
+      <button class="btn small" id="themeBtn">🌙</button>
+    </div>
+  </div>
+  <nav class="nav-tabs">
+    <button class="btn tab active" data-tab="builder" data-i18n="tabBuild">بناء رابط</button>
+    <button class="btn tab" data-tab="history" data-i18n="tabHistory">السجل</button>
+    <button class="btn tab" data-tab="batch" data-i18n="tabBatch">دفعات</button>
+  </nav>
+</header>
+
+<div class="wrap">
+  <!-- ===== الشاشة 1: بناء رابط ===== -->
+  <section id="builder" class="section">
+    <div id="editBanner" class="banner hidden">
+      <span data-i18n="editMode">✏️ وضع التعديل</span>
+      <button class="btn small" id="cancelEditBtn" data-i18n="cancel">إلغاء</button>
+    </div>
+    <div class="card">
+      <label for="base" data-i18n="lblBase">الرابط الأساسي *</label>
+      <input id="base" type="url" dir="ltr" placeholder="https://example.com/landing">
+      <label for="client" data-i18n="lblClient">العميل (client)</label>
+      <input id="client" data-i18n-ph="phClient" placeholder="اسم العميل">
+
+      <label for="source">source *</label>
+      <div class="row">
+        <input id="source" list="srcList" placeholder="facebook">
+        <button class="btn small" data-add="source" data-i18n="addValue">+ قيمة</button>
+      </div>
+      <label for="medium">medium *</label>
+      <div class="row">
+        <input id="medium" list="medList" placeholder="cpc">
+        <button class="btn small" data-add="medium" data-i18n="addValue">+ قيمة</button>
+      </div>
+      <datalist id="srcList"></datalist>
+      <datalist id="medList"></datalist>
+
+      <label for="campaign">campaign *</label>
+      <input id="campaign" placeholder="summer_sale_2026">
+      <label for="term" data-i18n="lblTerm">term</label>
+      <input id="term" data-i18n-ph="phOptional" placeholder="اختياري">
+      <label for="content" data-i18n="lblContent">content</label>
+      <input id="content" data-i18n-ph="phOptional" placeholder="اختياري">
+      <div id="warnings" class="warn"></div>
+    </div>
+
+    <div class="card">
+      <label data-i18n="lblFinal">الرابط النهائي</label>
+      <div id="out" class="url-box">—</div>
+      <div class="actions">
+        <button class="btn primary" id="copyBtn" data-i18n="copy">نسخ</button>
+        <button class="btn primary" id="saveBtn" data-i18n="saveHistory">حفظ في السجل</button>
+        <button class="btn" id="qrBtn">QR</button>
+        <button class="btn" id="clearBtn" data-i18n="clearFields">مسح الحقول</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== الشاشة 2: السجل ===== -->
+  <section id="history" class="section hidden">
+    <div class="card">
+      <input id="search" data-i18n-ph="searchPh" placeholder="بحث بالعميل أو الحملة أو المصدر">
+      <div class="row" style="margin-top:8px">
+        <select id="clientFilter"></select>
+      </div>
+      <p class="hint" id="count"></p>
+      <div class="actions">
+        <button class="btn" id="exportJsonBtn" data-i18n="exportBackup">تصدير نسخة احتياطية</button>
+        <label class="btn" style="margin:0;display:flex;align-items:center;justify-content:center">
+          <span data-i18n="importBackup">استيراد نسخة</span>
+          <input id="importFile" type="file" accept=".json,application/json" class="hidden">
+        </label>
+      </div>
+    </div>
+    <div id="historyList"></div>
+  </section>
+
+  <!-- ===== الشاشة 3: الدفعات ===== -->
+  <section id="batch" class="section hidden">
+    <div class="card">
+      <p class="hint" data-i18n="batchHint">الأعمدة بالترتيب: base, client, source, medium, campaign, term, content. لو أول سطر عناوين هيتقري تلقائياً. الفاصل: فاصلة أو Tab.</p>
+      <label for="batchFile" data-i18n="lblUploadCsv">ارفع ملف CSV</label>
+      <input id="batchFile" type="file" accept=".csv,.txt,text/csv">
+      <label for="batchText" data-i18n="lblPaste">أو الصق الصفوف هنا</label>
+      <textarea id="batchText" dir="ltr" style="text-align:left" placeholder="base,client,source,medium,campaign&#10;https://site.com,ClientA,facebook,cpc,summer"></textarea>
+      <label for="batchBase" data-i18n="lblDefBase">رابط أساسي افتراضي (لو صف مفيهوش base)</label>
+      <input id="batchBase" type="url" dir="ltr">
+      <div class="actions">
+        <button class="btn primary" id="processBtn" data-i18n="process">معالجة</button>
+        <button class="btn" id="clearBatchBtn" data-i18n="clear">مسح</button>
+      </div>
+      <p id="batchStatus" style="margin-top:10px"></p>
+    </div>
+    <div id="batchActions" class="card hidden">
+      <div class="actions">
+        <button class="btn" id="copyAllBtn" data-i18n="copyAll">نسخ كل الروابط</button>
+        <button class="btn" id="exportCsvBtn" data-i18n="exportCsv">تصدير CSV</button>
+        <button class="btn primary" id="saveBatchBtn" data-i18n="saveAll">حفظ الكل في السجل</button>
+      </div>
+    </div>
+    <div id="batchResults" class="card hidden"></div>
+  </section>
+</div>
+
+<!-- نافذة QR -->
+<div id="qrModal" class="modal">
+  <div class="card">
+    <h3 data-i18n="qrTitle">QR Code</h3>
+    <canvas id="qrCanvas"></canvas>
+    <p class="hint" id="qrUrl" dir="ltr" style="word-break:break-all;margin:10px 0"></p>
+    <div class="actions">
+      <button class="btn primary" id="qrDownload" data-i18n="downloadPng">تحميل PNG</button>
+      <button class="btn" id="qrClose" data-i18n="close">إغلاق</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+/* ===================== الترجمة ===================== */
+const I18N = {
+  ar: {
+    tabBuild:'بناء رابط', tabHistory:'السجل', tabBatch:'دفعات',
+    editMode:'✏️ وضع التعديل', cancel:'إلغاء',
+    lblBase:'الرابط الأساسي *', lblClient:'العميل (client)', phClient:'اسم العميل',
+    addValue:'+ قيمة', lblTerm:'term', lblContent:'content', phOptional:'اختياري',
+    lblFinal:'الرابط النهائي', copy:'نسخ', saveHistory:'حفظ في السجل', saveEdit:'حفظ التعديل',
+    clearFields:'مسح الحقول', searchPh:'بحث بالعميل أو الحملة أو المصدر', allClients:'كل العملاء',
+    exportBackup:'تصدير نسخة احتياطية', importBackup:'استيراد نسخة',
+    batchHint:'الأعمدة بالترتيب: base, client, source, medium, campaign, term, content. لو أول سطر عناوين هيتقري تلقائياً. الفاصل: فاصلة أو Tab.',
+    lblUploadCsv:'ارفع ملف CSV', lblPaste:'أو الصق الصفوف هنا', lblDefBase:'رابط أساسي افتراضي (لو صف مفيهوش base)',
+    process:'معالجة', clear:'مسح', copyAll:'نسخ كل الروابط', exportCsv:'تصدير CSV', saveAll:'حفظ الكل في السجل',
+    qrTitle:'QR Code', downloadPng:'تحميل PNG', close:'إغلاق',
+    themeDark:'🌙 داكن', themeLight:'☀️ فاتح', langBtn:'EN',
+    fBase:'الرابط الأساسي', warnEmpty:'⚠️ حقل {f} فاضي',
+    errBase:'الرابط الأساسي غير صحيح (لازم يبدأ بـ https://)', errProto:'الرابط لازم يبدأ بـ http أو https',
+    errLong:'الرابط طويل جداً لـ QR في هذا التطبيق', errNoBase:'حط رابط أساسي صحيح الأول',
+    errCopy:'تعذّر النسخ', copied:'تم النسخ ✓', copiedAll:'تم نسخ كل الروابط ✓',
+    saved:'تم الحفظ في السجل ✓', savedEdit:'تم حفظ التعديل ✓', savedN:'تم حفظ {n} رابط في السجل ✓',
+    fillMissing:'عبّي الحقول الناقصة: {f}', emptyClean:'القيمة فاضية بعد التنظيف', valueAdded:'تمت إضافة القيمة ✓',
+    promptSource:'قيمة source جديدة:', promptMedium:'قيمة medium جديدة:',
+    confirmDelete:'حذف هذا الرابط من السجل؟', deleted:'تم الحذف',
+    importOk:'تم استيراد {n} رابط ✓', importBad:'الملف مش صحيح أو مش نسخة احتياطية من التطبيق',
+    storageFull:'تعذّر الحفظ في المتصفح (المساحة ممتلئة؟)', missingPrefix:'ناقص: ',
+    noRows:'ما لقيتش صفوف في النص', countOf:'{n} من {t} رابط', noMatch:'لا توجد روابط مطابقة',
+    noClient:'بدون عميل', qr:'QR', edit:'تعديل', delete:'حذف',
+    created:'تم إنشاء {n} رابط', failed:'وفشل {n} صف',
+    colClient:'العميل', colCampaign:'الحملة', colUrlOrErr:'الرابط / الخطأ'
+  },
+  en: {
+    tabBuild:'Build', tabHistory:'History', tabBatch:'Batch',
+    editMode:'✏️ Edit mode', cancel:'Cancel',
+    lblBase:'Base URL *', lblClient:'Client', phClient:'Client name',
+    addValue:'+ Value', lblTerm:'term', lblContent:'content', phOptional:'Optional',
+    lblFinal:'Final URL', copy:'Copy', saveHistory:'Save to history', saveEdit:'Save changes',
+    clearFields:'Clear', searchPh:'Search by client, campaign or source', allClients:'All clients',
+    exportBackup:'Export backup', importBackup:'Import backup',
+    batchHint:'Column order: base, client, source, medium, campaign, term, content. A header row is detected automatically. Delimiter: comma or tab.',
+    lblUploadCsv:'Upload CSV file', lblPaste:'Or paste rows here', lblDefBase:'Default base URL (for rows without base)',
+    process:'Process', clear:'Clear', copyAll:'Copy all links', exportCsv:'Export CSV', saveAll:'Save all to history',
+    qrTitle:'QR Code', downloadPng:'Download PNG', close:'Close',
+    themeDark:'🌙 Dark', themeLight:'☀️ Light', langBtn:'عربي',
+    fBase:'Base URL', warnEmpty:'⚠️ {f} is empty',
+    errBase:'Invalid base URL (must start with https://)', errProto:'URL must start with http or https',
+    errLong:'URL too long for QR in this app', errNoBase:'Enter a valid base URL first',
+    errCopy:'Copy failed', copied:'Copied ✓', copiedAll:'All links copied ✓',
+    saved:'Saved to history ✓', savedEdit:'Changes saved ✓', savedN:'{n} links saved to history ✓',
+    fillMissing:'Fill in missing fields: {f}', emptyClean:'Value is empty after cleaning', valueAdded:'Value added ✓',
+    promptSource:'New source value:', promptMedium:'New medium value:',
+    confirmDelete:'Delete this link from history?', deleted:'Deleted',
+    importOk:'Imported {n} links ✓', importBad:'Invalid file or not a backup from this app',
+    storageFull:'Could not save in browser (storage full?)', missingPrefix:'Missing: ',
+    noRows:'No rows found', countOf:'{n} of {t} links', noMatch:'No matching links',
+    noClient:'No client', qr:'QR', edit:'Edit', delete:'Delete',
+    created:'{n} links created', failed:'{n} rows failed',
+    colClient:'Client', colCampaign:'Campaign', colUrlOrErr:'Link / error'
+  }
+};
+let lang = 'ar';
+// ترجمة نص مع استبدال المتغيرات {n} وغيرها
+function t(k, p) {
+  let s = (I18N[lang][k] ?? I18N.ar[k] ?? k);
+  if (p) for (const [x, v] of Object.entries(p)) s = s.replace('{' + x + '}', v);
+  return s;
+}
+
+/* ===================== أدوات عامة ===================== */
+const $ = s => document.querySelector(s);
+const $$ = s => document.querySelectorAll(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+
+// تخزين آمن في localStorage
+const LS = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch (e) { toast(t('storageFull'), 'err'); return false; } }
+};
+
+function toast(msg, type = 'ok') {
+  const el = $('#toast');
+  el.textContent = msg;
+  el.className = 'toast show ' + type;
+  clearTimeout(toast.timer);
+  toast.timer = setTimeout(() => el.classList.remove('show'), 3000);
+}
+
+// تحميل ملف (نص أو Blob)
+function download(name, content, type) {
+  const blob = content instanceof Blob ? content : new Blob([content], { type });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+}
+
+// نسخ للحافظة مع بديل للمتصفحات القديمة
+async function copyText(txt) {
+  try { await navigator.clipboard.writeText(txt); return true; } catch (e) {}
+  const ta = document.createElement('textarea');
+  ta.value = txt; ta.style.position = 'fixed'; ta.style.opacity = '0';
+  document.body.appendChild(ta); ta.select();
+  let ok = false;
+  try { ok = document.execCommand('copy'); } catch (e) {}
+  ta.remove();
+  return ok;
+}
+
+/* ===================== قواعد التسمية ===================== */
+// حروف صغيرة + مسافات → _ + إزالة الحروف الخاصة (العربي مسموح)
+function clean(v) {
+  return String(v ?? '').trim().toLowerCase()
+    .replace(/\s+/g, '_')
+    .replace(/[^\p{L}\p{N}_-]/gu, '')
+    .replace(/_+/g, '_')
+    .replace(/^_|_$/g, '');
+}
+
+// بناء الرابط مع الحفاظ على باراميترات الرابط الأصلي
+function buildUrl(p) {
+  let u;
+  try { u = new URL(String(p.base || '').trim()); }
+  catch (e) { throw new Error(t('errBase')); }
+  if (!/^https?:$/.test(u.protocol)) throw new Error(t('errProto'));
+  const params = { utm_source: p.source, utm_medium: p.medium, utm_campaign: p.campaign, utm_term: p.term, utm_content: p.content };
+  for (const [k, v] of Object.entries(params)) {
+    const c = clean(v);
+    if (c) u.searchParams.set(k, c);
+  }
+  return u.toString();
+}
+
+// الحقول المطلوبة الفاضية
+const REQUIRED = [['base', 'fBase'], ['source', 'source'], ['medium', 'medium'], ['campaign', 'campaign']];
+function missingFields(f) {
+  return REQUIRED
+    .filter(([k]) => !(k === 'base' ? String(f.base || '').trim() : clean(f[k])))
+    .map(([k, label]) => (label === 'fBase' ? t('fBase') : label));
+}
+
+/* ===================== القوائم المقترحة ===================== */
+const DEF = {
+  source: ['facebook', 'instagram', 'google', 'tiktok', 'youtube', 'linkedin', 'twitter', 'snapchat', 'whatsapp', 'email', 'newsletter'],
+  medium: ['cpc', 'paid_social', 'social', 'organic_social', 'email', 'display', 'referral', 'affiliate', 'banner', 'video']
+};
+let presets = LS.get('utm_presets_v1', null) || { source: [...DEF.source], medium: [...DEF.medium] };
+
+function renderPresets() {
+  $('#srcList').innerHTML = presets.source.map(v => `<option value="${esc(v)}">`).join('');
+  $('#medList').innerHTML = presets.medium.map(v => `<option value="${esc(v)}">`).join('');
+}
+
+// إضافة قيمة خاصة بالفريق
+function addPreset(kind) {
+  const v = prompt(kind === 'source' ? t('promptSource') : t('promptMedium'));
+  if (v === null) return;
+  const c = clean(v);
+  if (!c) return toast(t('emptyClean'), 'err');
+  if (!presets[kind].includes(c)) presets[kind].push(c);
+  LS.set('utm_presets_v1', presets);
+  renderPresets();
+  $('#' + kind).value = c;
+  updatePreview();
+  toast(t('valueAdded'));
+}
+
+/* ===================== الشاشة 1: البناء ===================== */
+const FIELDS = ['base', 'client', 'source', 'medium', 'campaign', 'term', 'content'];
+let history = LS.get('utm_history_v1', []);
+let lastUrl = '';
+let editingId = null;
+
+function readForm() {
+  const o = {};
+  FIELDS.forEach(k => o[k] = $('#' + k).value);
+  o.base = o.base.trim();
+  o.client = o.client.trim();
+  return o;
+}
+
+// تحديث الرابط والتنبيهات فوراً
+function updatePreview() {
+  const f = readForm();
+  const miss = missingFields(f);
+  let url = '', err = '';
+  if (f.base) { try { url = buildUrl(f); } catch (e) { err = e.message; } }
+  const msgs = miss.map(m => t('warnEmpty', { f: m }));
+  if (err) msgs.push('⚠️ ' + err);
+  $('#warnings').innerHTML = msgs.map(esc).join('<br>');
+  $('#out').textContent = url || '—';
+  lastUrl = url;
+}
+
+function setSaveLabel() {
+  $('#saveBtn').textContent = editingId ? t('saveEdit') : t('saveHistory');
+}
+
+function resetForm() {
+  FIELDS.forEach(k => $('#' + k).value = '');
+  editingId = null;
+  $('#editBanner').classList.add('hidden');
+  setSaveLabel();
+  updatePreview();
+}
+
+// حفظ رابط جديد أو تعديل قديم
+function saveRecord() {
+  const f = readForm();
+  const miss = missingFields(f);
+  if (miss.length) return toast(t('fillMissing', { f: miss.join('، ') }), 'err');
+  let url;
+  try { url = buildUrl(f); } catch (e) { return toast(e.message, 'err'); }
+
+  const old = editingId ? history.find(r => r.id === editingId) : null;
+  const rec = {
+    id: old ? old.id : uid(),
+    client: f.client,
+    date: old ? old.date : new Date().toISOString(),
+    base: f.base,
+    source: clean(f.source), medium: clean(f.medium), campaign: clean(f.campaign),
+    term: clean(f.term), content: clean(f.content),
+    url
+  };
+  if (old) history[history.indexOf(old)] = rec;
+  else history.unshift(rec);
+
+  if (!LS.set('utm_history_v1', history)) return;
+  toast(old ? t('savedEdit') : t('saved'));
+  if (old) resetForm();
+  renderHistory();
+}
+
+// تحميل سجل في الفورم للتعديل
+function startEdit(id) {
+  const r = history.find(x => x.id === id);
+  if (!r) return;
+  editingId = id;
+  FIELDS.forEach(k => $('#' + k).value = r[k] || '');
+  $('#editBanner').classList.remove('hidden');
+  setSaveLabel();
+  showTab('builder');
+  updatePreview();
+}
+
+/* ===================== الشاشة 2: السجل ===================== */
+function renderHistory() {
+  const sel = $('#clientFilter');
+  const clients = [...new Set(history.map(r => r.client).filter(Boolean))].sort();
+  const cur = sel.value;
+  sel.innerHTML = `<option value="">${esc(t('allClients'))}</option>` + clients.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
+  sel.value = clients.includes(cur) ? cur : '';
+
+  const q = $('#search').value.trim().toLowerCase();
+  const list = history.filter(r =>
+    (!sel.value || r.client === sel.value) &&
+    (!q || [r.client, r.campaign, r.source, r.medium].join(' ').toLowerCase().includes(q))
+  );
+  $('#count').textContent = t('countOf', { n: list.length, t: history.length });
+
+  $('#historyList').innerHTML = list.length ? list.map(r => `
+    <div class="card">
+      <div class="row"><strong>${esc(r.campaign || '—')}</strong><span class="badge">${esc(r.client || t('noClient'))}</span></div>
+      <div class="hint">${esc(r.source)} / ${esc(r.medium)} · ${new Date(r.date).toLocaleDateString(lang === 'ar' ? 'ar' : 'en')}</div>
+      <div class="url-box">${esc(r.url)}</div>
+      <div class="actions">
+        <button class="btn small primary" data-act="copy" data-id="${r.id}">${esc(t('copy'))}</button>
+        <button class="btn small" data-act="edit" data-id="${r.id}">${esc(t('edit'))}</button>
+        <button class="btn small" data-act="qr" data-id="${r.id}">${esc(t('qr'))}</button>
+        <button class="btn small danger" data-act="del" data-id="${r.id}">${esc(t('delete'))}</button>
+      </div>
+    </div>`).join('') : `<p class="hint">${esc(t('noMatch'))}</p>`;
+}
+
+async function onHistoryClick(e) {
+  const b = e.target.closest('button[data-act]');
+  if (!b) return;
+  const r = history.find(x => x.id === b.dataset.id);
+  if (!r) return;
+  if (b.dataset.act === 'copy') {
+    const ok = await copyText(r.url);
+    toast(ok ? t('copied') : t('errCopy'), ok ? 'ok' : 'err');
+  }
+  if (b.dataset.act === 'edit') startEdit(r.id);
+  if (b.dataset.act === 'qr') openQR(r.url, r.campaign);
+  if (b.dataset.act === 'del') {
+    if (!confirm(t('confirmDelete'))) return;
+    history = history.filter(x => x.id !== r.id);
+    LS.set('utm_history_v1', history);
+    renderHistory();
+    toast(t('deleted'));
+  }
+}
+
+// نسخة احتياطية JSON
+function exportBackup() {
+  const data = { app: 'UTM Builder', version: 1, exported: new Date().toISOString(), items: history };
+  download('utm-backup-' + new Date().toISOString().slice(0, 10) + '.json', JSON.stringify(data, null, 2), 'application/json');
+}
+
+// استيراد نسخة احتياطية (دمج بدون تكرار)
+async function importBackup(file) {
+  try {
+    const data = JSON.parse(await file.text());
+    const items = Array.isArray(data) ? data : data.items;
+    if (!Array.isArray(items)) throw new Error('bad');
+    const ids = new Set(history.map(r => r.id));
+    let added = 0;
+    items.forEach(r => {
+      if (!r || !r.url) return;
+      r.id = r.id || uid();
+      if (!ids.has(r.id)) { history.push(r); ids.add(r.id); added++; }
+    });
+    LS.set('utm_history_v1', history);
+    renderHistory();
+    toast(t('importOk', { n: added }));
+  } catch (err) {
+    toast(t('importBad'), 'err');
+  }
+}
+
+/* ===================== الشاشة 3: الدفعات ===================== */
+const KEYS = ['base', 'client', 'source', 'medium', 'campaign', 'term', 'content'];
+let batchResults = [];
+
+// قراءة CSV مع دعم الاقتباس والفاصلة/Tab
+function parseRows(text) {
+  const delim = text.split(/\r?\n/)[0].includes('\t') ? '\t' : ',';
+  const rows = [];
+  let row = [], cur = '', q = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (q) {
+      if (c === '"') { if (text[i + 1] === '"') { cur += '"'; i++; } else q = false; }
+      else cur += c;
+    } else if (c === '"') q = true;
+    else if (c === delim) { row.push(cur); cur = ''; }
+    else if (c === '\n') { row.push(cur); rows.push(row); row = []; cur = ''; }
+    else if (c !== '\r') cur += c;
+  }
+  row.push(cur); rows.push(row);
+  return rows.map(r => r.map(x => x.trim())).filter(r => r.some(x => x));
+}
+
+function processBatch() {
+  const text = $('#batchText').value.trim();
+  if (!text) return toast(t('noRows'), 'err');
+
+  const rows = parseRows(text);
+  let map = KEYS, data = rows;
+  const first = rows[0].map(h => h.toLowerCase().replace(/^utm_/, '').replace(/^url$/, 'base'));
+  if (first.some(h => ['base', 'source', 'medium', 'campaign'].includes(h))) {
+    map = first; data = rows.slice(1);
+  }
+
+  const defBase = $('#batchBase').value.trim();
+  batchResults = data.map((r, i) => {
+    const o = {};
+    map.forEach((k, j) => { if (k) o[k] = r[j] || ''; });
+    if (!o.base) o.base = defBase;
+    const miss = missingFields(o);
+    let url = '', err = '';
+    if (miss.length) err = t('missingPrefix') + miss.join('، ');
+    else { try { url = buildUrl(o); } catch (e) { err = e.message; } }
+    return { n: i + 1, o, url, err };
+  });
+
+  renderBatch();
+  if (!batchResults.length) toast(t('noRows'), 'err');
+}
+
+function renderBatch() {
+  const ok = batchResults.filter(r => r.url).length;
+  const bad = batchResults.length - ok;
+  $('#batchStatus').innerHTML = batchResults.length
+    ? `<b>${esc(t('created', { n: ok }))}</b>` + (bad ? ` · ${esc(t('failed', { n: bad }))}` : '')
+    : '';
+  $('#batchActions').classList.toggle('hidden', !ok);
+  $('#batchResults').classList.toggle('hidden', !batchResults.length);
+  $('#batchResults').innerHTML = batchResults.length ? `
+    <div class="table-wrap"><table>
+      <tr><th>#</th><th>${esc(t('colClient'))}</th><th>${esc(t('colCampaign'))}</th><th>${esc(t('colUrlOrErr'))}</th><th></th></tr>
+      ${batchResults.map((r, i) => `
+        <tr>
+          <td>${r.n}</td>
+          <td>${esc(r.o.client || '')}</td>
+          <td>${esc(r.o.campaign || '')}</td>
+          <td class="${r.url ? '' : 'err-text'}" dir="ltr">${esc(r.url || r.err)}</td>
+          <td>${r.url ? `<button class="btn small" data-qr="${i}">${esc(t('qr'))}</button>` : ''}</td>
+        </tr>`).join('')}
+    </table></div>` : '';
+}
+
+// تصدير النتائج CSV (مع BOM عشان إكسل يقرأ العربي)
+const csvCell = v => `"${String(v ?? '').replace(/"/g, '""')}"`;
+function exportBatchCSV() {
+  const cols = ['client', 'base', 'source', 'medium', 'campaign', 'term', 'content', 'url'];
+  const lines = [cols.join(',')];
+  batchResults.filter(r => r.url).forEach(r => {
+    lines.push(cols.map(c => {
+      if (c === 'url') return csvCell(r.url);
+      if (c === 'client' || c === 'base') return csvCell(r.o[c] || '');
+      return csvCell(clean(r.o[c]));
+    }).join(','));
+  });
+  download('utm-batch.csv', '\uFEFF' + lines.join('\r\n'), 'text/csv;charset=utf-8');
+}
+
+function saveBatch() {
+  let n = 0;
+  batchResults.filter(r => r.url).forEach(r => {
+    history.unshift({
+      id: uid(), client: r.o.client || '', date: new Date().toISOString(),
+      base: r.o.base, source: clean(r.o.source), medium: clean(r.o.medium),
+      campaign: clean(r.o.campaign), term: clean(r.o.term), content: clean(r.o.content), url: r.url
+    });
+    n++;
+  });
+  if (LS.set('utm_history_v1', history)) toast(t('savedN', { n }));
+  renderHistory();
+}
+
+/* ===================== QR Code (مدمج، بدون مكتبات خارجية) ===================== */
+// Reed-Solomon over GF(256)
+function gfMul(x, y) {
+  let z = 0;
+  for (let i = 7; i >= 0; i--) {
+    z = (z << 1) ^ ((z >>> 7) * 0x11D);
+    z ^= ((y >>> i) & 1) * x;
+  }
+  return z;
+}
+function rsGen(deg) {
+  let p = [1], root = 1;
+  for (let i = 0; i < deg; i++) {
+    const q = new Array(p.length + 1).fill(0);
+    for (let j = 0; j < p.length; j++) {
+      q[j] ^= p[j];
+      q[j + 1] ^= gfMul(p[j], root);
+    }
+    p = q; root = gfMul(root, 2);
+  }
+  return p.slice(1);
+}
+function rsCompute(data, gen) {
+  const res = new Array(gen.length).fill(0);
+  for (const d of data) {
+    const f = d ^ res.shift();
+    res.push(0);
+    gen.forEach((g, j) => { res[j] ^= gfMul(g, f); });
+  }
+  return res;
+}
+// عدد وحدات البيانات في النسخة
+function rawMods(v) {
+  let r = (16 * v + 128) * v + 64;
+  if (v >= 2) {
+    const n = Math.floor(v / 7) + 2;
+    r -= (25 * n - 10) * n - 55;
+    if (v >= 7) r -= 36;
+  }
+  return r;
+}
+function alignPos(v, size) {
+  if (v === 1) return [];
+  const n = Math.floor(v / 7) + 2;
+  const step = v === 32 ? 26 : Math.ceil((size - 13) / (2 * n - 2)) * 2;
+  const r = [6];
+  for (let pos = size - 7; r.length < n; pos -= step) r.splice(1, 0, pos);
+  return r;
+}
+
+// يبني مصفوفة QR (مستوى تصحيح M، نسخ 1-10 ≈ حتى ~200 حرف)
+function qrMatrix(text) {
+  const bytes = new TextEncoder().encode(text);
+  const ECC = [0, 10, 16, 26, 18, 24, 16, 18, 22, 22, 26];
+  const BLK = [0, 1, 1, 1, 2, 2, 4, 4, 4, 5, 5];
+
+  // اختيار أصغر نسخة تكفي
+  let ver = 0;
+  for (let v = 1; v <= 10; v++) {
+    const dataCw = Math.floor(rawMods(v) / 8) - ECC[v] * BLK[v];
+    if (4 + (v < 10 ? 8 : 16) + bytes.length * 8 <= dataCw * 8) { ver = v; break; }
+  }
+  if (!ver) throw new Error(t('errLong'));
+
+  const total = Math.floor(rawMods(ver) / 8), numBlk = BLK[ver], eccLen = ECC[ver];
+  const dataCw = total - eccLen * numBlk;
+
+  // بيانات بـ byte mode
+  const bits = [];
+  const push = (v, n) => { for (let i = n - 1; i >= 0; i--) bits.push((v >>> i) & 1); };
+  push(4, 4);
+  push(bytes.length, ver < 10 ? 8 : 16);
+  bytes.forEach(b => push(b, 8));
+  const cap = dataCw * 8;
+  push(0, Math.min(4, cap - bits.length));
+  while (bits.length % 8) bits.push(0);
+  for (let p = 0xEC; bits.length < cap; p = p === 0xEC ? 0x11 : 0xEC) push(p, 8);
+
+  const data = [];
+  for (let i = 0; i < bits.length; i += 8) {
+    let b = 0;
+    for (let j = 0; j < 8; j++) b = (b << 1) | bits[i + j];
+    data.push(b);
+  }
+
+  // تقسيم لبلوكات + تصحيح الأخطاء + تداخل
+  const shortLen = Math.floor(total / numBlk), numShort = numBlk - (total % numBlk);
+  const gen = rsGen(eccLen);
+  const dBlocks = [], eBlocks = [];
+  let k = 0;
+  for (let i = 0; i < numBlk; i++) {
+    const dl = shortLen - eccLen + (i < numShort ? 0 : 1);
+    const blk = data.slice(k, k + dl); k += dl;
+    dBlocks.push(blk);
+    eBlocks.push(rsCompute(blk, gen));
+  }
+  const all = [];
+  const maxD = Math.max(...dBlocks.map(b => b.length));
+  for (let i = 0; i < maxD; i++) dBlocks.forEach(b => { if (i < b.length) all.push(b[i]); });
+  for (let i = 0; i < eccLen; i++) eBlocks.forEach(b => all.push(b[i]));
+  const fbits = [];
+  all.forEach(b => { for (let i = 7; i >= 0; i--) fbits.push((b >> i) & 1); });
+
+  // المصفوفة + أنماط الوظائف
+  const size = ver * 4 + 17;
+  const mod = [], fn = [];
+  for (let i = 0; i < size; i++) { mod.push(new Array(size).fill(false)); fn.push(new Array(size).fill(false)); }
+  const set = (x, y, d) => { mod[y][x] = d; fn[y][x] = true; };
+
+  // Timing (قبل الـ finders عشان تتكتب فوقها)
+  for (let i = 0; i < size; i++) { set(6, i, i % 2 === 0); set(i, 6, i % 2 === 0); }
+
+  // Finder patterns
+  for (const [cx, cy] of [[3, 3], [size - 4, 3], [3, size - 4]]) {
+    for (let dy = -4; dy <= 4; dy++) for (let dx = -4; dx <= 4; dx++) {
+      const x = cx + dx, y = cy + dy;
+      if (x >= 0 && y >= 0 && x < size && y < size) {
+        const d = Math.max(Math.abs(dx), Math.abs(dy));
+        set(x, y, d !== 2 && d !== 4);
+      }
+    }
+  }
+
+  // Alignment patterns
+  const pos = alignPos(ver, size), n = pos.length;
+  for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) {
+    if ((i === 0 && j === 0) || (i === 0 && j === n - 1) || (i === n - 1 && j === 0)) continue;
+    for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++)
+      set(pos[i] + dx, pos[j] + dy, Math.max(Math.abs(dx), Math.abs(dy)) !== 1);
+  }
+
+  // Version info (للنسخ 7+)
+  if (ver >= 7) {
+    let rem = ver;
+    for (let i = 0; i < 12; i++) rem = (rem << 1) ^ ((rem >>> 11) * 0x1F25);
+    const vb = (ver << 12) | rem;
+    for (let i = 0; i < 18; i++) {
+      const bit = ((vb >>> i) & 1) === 1;
+      const a = size - 11 + (i % 3), b = Math.floor(i / 3);
+      set(a, b, bit); set(b, a, bit);
+    }
+  }
+
+  // Format info (M + mask 0)
+  let rem = 0;
+  for (let i = 0; i < 10; i++) rem = (rem << 1) ^ ((rem >>> 9) * 0x537);
+  const fb = ((0 << 10) | rem) ^ 0x5412;
+  const bit = i => ((fb >>> i) & 1) === 1;
+  for (let i = 0; i <= 5; i++) set(8, i, bit(i));
+  set(8, 7, bit(6)); set(8, 8, bit(7)); set(7, 8, bit(8));
+  for (let i = 9; i < 15; i++) set(14 - i, 8, bit(i));
+  for (let i = 0; i < 8; i++) set(size - 1 - i, 8, bit(i));
+  for (let i = 8; i < 15; i++) set(8, size - 15 + i, bit(i));
+  set(8, size - 8, true);
+
+  // وضع البيانات بنمط الزجزاج
+  let idx = 0;
+  for (let right = size - 1; right >= 1; right -= 2) {
+    if (right === 6) right = 5;
+    for (let vert = 0; vert < size; vert++) {
+      for (let j = 0; j < 2; j++) {
+        const x = right - j;
+        const upward = ((right + 1) & 2) === 0;
+        const y = upward ? size - 1 - vert : vert;
+        if (!fn[y][x] && idx < fbits.length) { mod[y][x] = fbits[idx] === 1; idx++; }
+      }
+    }
+  }
+
+  // تطبيق الماسك 0 على البيانات فقط
+  for (let y = 0; y < size; y++) for (let x = 0; x < size; x++)
+    if (!fn[y][x] && (x + y) % 2 === 0) mod[y][x] = !mod[y][x];
+
+  return mod;
+}
+
+function drawQR(text, canvas) {
+  const m = qrMatrix(text), n = m.length, q = 4, s = 8, px = (n + q * 2) * s;
+  canvas.width = px; canvas.height = px;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, px, px);
+  ctx.fillStyle = '#000';
+  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++)
+    if (m[y][x]) ctx.fillRect((x + q) * s, (y + q) * s, s, s);
+}
+
+let qrCurrent = { url: '', name: 'link' };
+function openQR(url, name) {
+  try { drawQR(url, $('#qrCanvas')); }
+  catch (e) { return toast(e.message, 'err'); }
+  qrCurrent = { url, name: name || 'link' };
+  $('#qrUrl').textContent = url;
+  $('#qrModal').classList.add('show');
+}
+
+function downloadQR() {
+  $('#qrCanvas').toBlob(blob => {
+    const safe = qrCurrent.name.replace(/[^\p{L}\p{N}_-]+/gu, '_') || 'link';
+    download(`utm-qr-${safe}.png`, blob, 'image/png');
+  }, 'image/png');
+}
+
+/* ===================== التنقل والثيم واللغة ===================== */
+function showTab(name) {
+  $$('.tab').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
+  $$('.section').forEach(s => s.classList.toggle('hidden', s.id !== name));
+  if (name === 'history') renderHistory();
+}
+
+function applyTheme(th) {
+  document.documentElement.dataset.theme = th;
+  $('#themeBtn').textContent = th === 'dark' ? t('themeLight') : t('themeDark');
+  LS.set('utm_theme', th);
+}
+
+// تبديل اللغة: ترجمة كل النصوص + اتجاه الصفحة
+function applyLang(l) {
+  lang = l;
+  LS.set('utm_lang', l);
+  document.documentElement.lang = l;
+  document.documentElement.dir = l === 'ar' ? 'rtl' : 'ltr';
+  $$('[data-i18n]').forEach(el => el.textContent = t(el.dataset.i18n));
+  $$('[data-i18n-ph]').forEach(el => el.placeholder = t(el.dataset.i18nPh));
+  $('#langBtn').textContent = t('langBtn');
+  applyTheme(document.documentElement.dataset.theme || 'light');
+  setSaveLabel();
+  renderHistory();
+  updatePreview();
+  if (batchResults.length) processBatch(); // إعادة بناء الرسائل باللغة الجديدة
+}
+
+/* ===================== ربط الأحداث ===================== */
+$$('.tab').forEach(b => b.addEventListener('click', () => showTab(b.dataset.tab)));
+$('#themeBtn').addEventListener('click', () => applyTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'));
+$('#langBtn').addEventListener('click', () => applyLang(lang === 'ar' ? 'en' : 'ar'));
+
+FIELDS.forEach(k => $('#' + k).addEventListener('input', updatePreview));
+$$('[data-add]').forEach(b => b.addEventListener('click', () => addPreset(b.dataset.add)));
+
+$('#copyBtn').addEventListener('click', async () => {
+  if (!lastUrl) return toast(t('errNoBase'), 'err');
+  const ok = await copyText(lastUrl);
+  toast(ok ? t('copied') : t('errCopy'), ok ? 'ok' : 'err');
+});
+$('#saveBtn').addEventListener('click', saveRecord);
+$('#qrBtn').addEventListener('click', () => lastUrl ? openQR(lastUrl, readForm().campaign) : toast(t('errNoBase'), 'err'));
+$('#clearBtn').addEventListener('click', resetForm);
+$('#cancelEditBtn').addEventListener('click', resetForm);
+
+$('#search').addEventListener('input', renderHistory);
+$('#clientFilter').addEventListener('change', renderHistory);
+$('#historyList').addEventListener('click', onHistoryClick);
+$('#exportJsonBtn').addEventListener('click', exportBackup);
+$('#importFile').addEventListener('change', e => {
+  const f = e.target.files[0];
+  if (f) importBackup(f);
+  e.target.value = '';
+});
+
+$('#batchFile').addEventListener('change', async e => {
+  const f = e.target.files[0];
+  if (!f) return;
+  $('#batchText').value = await f.text();
+  processBatch();
+});
+$('#processBtn').addEventListener('click', processBatch);
+$('#clearBatchBtn').addEventListener('click', () => {
+  $('#batchText').value = ''; $('#batchFile').value = '';
+  batchResults = []; renderBatch();
+});
+$('#copyAllBtn').addEventListener('click', async () => {
+  const urls = batchResults.filter(r => r.url).map(r => r.url).join('\n');
+  const ok = await copyText(urls);
+  toast(ok ? t('copiedAll') : t('errCopy'), ok ? 'ok' : 'err');
+});
+$('#exportCsvBtn').addEventListener('click', exportBatchCSV);
+$('#saveBatchBtn').addEventListener('click', saveBatch);
+$('#batchResults').addEventListener('click', e => {
+  const b = e.target.closest('button[data-qr]');
+  if (!b) return;
+  const r = batchResults[+b.dataset.qr];
+  if (r) openQR(r.url, r.o.campaign);
+});
+
+$('#qrDownload').addEventListener('click', downloadQR);
+$('#qrClose').addEventListener('click', () => $('#qrModal').classList.remove('show'));
+$('#qrModal').addEventListener('click', e => { if (e.target.id === 'qrModal') e.target.classList.remove('show'); });
+
+/* ===================== التشغيل ===================== */
+lang = LS.get('utm_lang', 'ar') === 'en' ? 'en' : 'ar';
+applyTheme(LS.get('utm_theme', matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
+applyLang(lang);
+renderPresets();
+</script>
+</body>
+</html>
